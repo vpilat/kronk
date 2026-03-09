@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -42,6 +43,8 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 		}
 
 		outputTokens := s.reasonTokens + s.completionTokens
+		draftTokens := s.specDraftedTotal
+		draftAcceptedTokens := s.specAcceptedTotal
 
 		s.span.End()
 		e.freeSlotResources(s)
@@ -49,7 +52,7 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 
 		remaining := e.model.activeStreams.Add(-1)
 
-		e.model.log(ctx, "batch-engine",
+		args := []any{
 			"status", "slot-finished",
 			"slot", slotID,
 			"seq", seqID,
@@ -58,7 +61,18 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 			"output_tokens", outputTokens,
 			"time", elapsed.String(),
 			"active_streams", remaining,
-		)
+		}
+
+		if draftTokens > 0 {
+			rate := float64(draftAcceptedTokens) / float64(draftTokens)
+			args = append(args,
+				"draft_tokens", draftTokens,
+				"draft_accepted_tokens", draftAcceptedTokens,
+				"draft_acceptance_rate", fmt.Sprintf("%.2f", rate),
+			)
+		}
+
+		e.model.log(ctx, "batch-engine", args...)
 	}()
 
 	if !s.startTime.IsZero() {
@@ -130,13 +144,19 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 		}
 
 		usage := Usage{
-			PromptTokens:       s.nPrompt,
-			ReasoningTokens:    s.reasonTokens,
-			CompletionTokens:   s.completionTokens,
-			OutputTokens:       outputTokens,
-			TotalTokens:        s.nPrompt + outputTokens,
-			TokensPerSecond:    tokensPerSecond,
-			TimeToFirstTokenMS: float64(s.ttft.Microseconds()) / 1000.0,
+			PromptTokens:        s.nPrompt,
+			ReasoningTokens:     s.reasonTokens,
+			CompletionTokens:    s.completionTokens,
+			OutputTokens:        outputTokens,
+			TotalTokens:         s.nPrompt + outputTokens,
+			TokensPerSecond:     tokensPerSecond,
+			TimeToFirstTokenMS:  float64(s.ttft.Microseconds()) / 1000.0,
+			DraftTokens:         s.specDraftedTotal,
+			DraftAcceptedTokens: s.specAcceptedTotal,
+		}
+
+		if usage.DraftTokens > 0 {
+			usage.DraftAcceptanceRate = float64(usage.DraftAcceptedTokens) / float64(usage.DraftTokens)
 		}
 
 		e.model.sendErrorResponse(ctx, s.job.ch, s.job.id, s.job.object, 0, "", err, usage)
@@ -188,13 +208,19 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 	}
 
 	usage := Usage{
-		PromptTokens:       s.nPrompt,
-		ReasoningTokens:    s.reasonTokens,
-		CompletionTokens:   s.completionTokens,
-		OutputTokens:       outputTokens,
-		TotalTokens:        totalTokens,
-		TokensPerSecond:    tokensPerSecond,
-		TimeToFirstTokenMS: float64(s.ttft.Microseconds()) / 1000.0,
+		PromptTokens:        s.nPrompt,
+		ReasoningTokens:     s.reasonTokens,
+		CompletionTokens:    s.completionTokens,
+		OutputTokens:        outputTokens,
+		TotalTokens:         totalTokens,
+		TokensPerSecond:     tokensPerSecond,
+		TimeToFirstTokenMS:  float64(s.ttft.Microseconds()) / 1000.0,
+		DraftTokens:         s.specDraftedTotal,
+		DraftAcceptedTokens: s.specAcceptedTotal,
+	}
+
+	if usage.DraftTokens > 0 {
+		usage.DraftAcceptanceRate = float64(usage.DraftAcceptedTokens) / float64(usage.DraftTokens)
 	}
 
 	// Add span attributes and end span.
@@ -205,6 +231,8 @@ func (e *batchEngine) finishSlot(s *slot, err error) {
 		attribute.Int("output_tokens", outputTokens),
 		attribute.Int("total_tokens", totalTokens),
 		attribute.Float64("tokens_per_second", tokensPerSecond),
+		attribute.Int("draft_tokens", s.specDraftedTotal),
+		attribute.Int("draft_accepted_tokens", s.specAcceptedTotal),
 	)
 
 	// Add metrics.
@@ -303,6 +331,16 @@ func (e *batchEngine) failJob(job *chatJob, err error) {
 }
 
 func (e *batchEngine) freeSlotResources(s *slot) {
+	// Unregister the per-slot draft sampler from the draft context before
+	// freeing it, to prevent a dangling pointer in the context's sampler map.
+	if s.draftSampler != 0 && e.model.draft != nil {
+		draft := e.model.draft
+		if draft.registeredSampler == s.draftSampler {
+			llama.SetSampler(draft.lctx, draft.registeredSeqID, 0)
+			draft.registeredSampler = 0
+		}
+	}
+
 	if s.sampler != 0 {
 		llama.SamplerFree(s.sampler)
 		s.sampler = 0
