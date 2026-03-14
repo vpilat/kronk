@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import KeyValueTable from '../KeyValueTable';
 import { formatBytes } from '../../lib/format';
-import { PARAM_TOOLTIPS, ParamTooltip } from '../ParamTooltips';
+import { labelWithTip } from '../ParamTooltips';
 import type { VRAMInput, MoEInfo, WeightBreakdown, PerDeviceVRAM, DeviceInfo } from '../../types';
 
 interface VRAMResultsProps {
@@ -30,6 +31,8 @@ interface VRAMResultsProps {
   gpuTotalBytes?: number;
   gpuDevices?: DeviceInfo[];
   tensorSplit?: string;
+  isHardwareOverridden?: boolean;
+  modelUrl?: string;
 }
 
 export default function VRAMResults({
@@ -58,6 +61,8 @@ export default function VRAMResults({
   gpuTotalBytes,
   gpuDevices,
   tensorSplit,
+  isHardwareOverridden,
+  modelUrl,
 }: VRAMResultsProps) {
   const isMoE = moe?.is_moe === true && weights != null;
   const kvOnCPU = kvCacheOnCPU ?? false;
@@ -74,50 +79,50 @@ export default function VRAMResults({
   let breakdownRows: { label: ReactNode; value: string }[];
   if (isMoE) {
     breakdownRows = [
-      { label: <>Always-Active Weights (GPU)<ParamTooltip text={PARAM_TOOLTIPS.alwaysActiveWeights} /></>, value: formatBytes(alwaysActiveGPUBytes ?? 0) },
-      ...(alwaysActiveCPUBytes != null && alwaysActiveCPUBytes > 0 ? [{ label: <>Always-Active Weights (CPU)<ParamTooltip text={PARAM_TOOLTIPS.alwaysActiveWeights} /></>, value: formatBytes(alwaysActiveCPUBytes) }] : []),
+      { label: labelWithTip('Always-Active Weights (GPU)', 'alwaysActiveWeights'), value: formatBytes(alwaysActiveGPUBytes ?? 0) },
+      ...(alwaysActiveCPUBytes != null && alwaysActiveCPUBytes > 0 ? [{ label: labelWithTip('Always-Active Weights (CPU)', 'alwaysActiveWeights'), value: formatBytes(alwaysActiveCPUBytes) }] : []),
       {
-        label: <>Expert Weights — GPU ({expertLayersOnGPU ?? 0} layers)<ParamTooltip text={PARAM_TOOLTIPS.expertWeightsGPU} /></>,
+        label: labelWithTip(`Expert Weights — GPU (${expertLayersOnGPU ?? 0} layers)`, 'expertWeightsGPU'),
         value: formatBytes(expertGPUBytes ?? 0),
       },
-      { label: <>Expert Weights — CPU<ParamTooltip text={PARAM_TOOLTIPS.expertWeightsCPU} /></>, value: formatBytes(expertCPUBytes ?? 0) },
-      { label: <>KV Cache ({kvCacheLocation})<ParamTooltip text={PARAM_TOOLTIPS.kvCache} /></>, value: formatBytes(slotMemory) },
-      { label: <>Compute Buffer (estimate)<ParamTooltip text={PARAM_TOOLTIPS.computeBuffer} /></>, value: `~${formatBytes(computeBufferEst ?? 0)}` },
+      { label: labelWithTip('Expert Weights — CPU', 'expertWeightsCPU'), value: formatBytes(expertCPUBytes ?? 0) },
+      { label: labelWithTip(`KV Cache (${kvCacheLocation})`, 'kvCache'), value: formatBytes(slotMemory) },
+      { label: labelWithTip('Compute Buffer (estimate)', 'computeBuffer'), value: `~${formatBytes(computeBufferEst ?? 0)}` },
     ];
   } else if (isPartialGPU) {
     breakdownRows = [
-      { label: <>Weights on GPU ({gpuLayers} of {input.block_count} layers)<ParamTooltip text={PARAM_TOOLTIPS.gpuLayers} /></>, value: formatBytes(modelWeightsGPU ?? 0) },
-      { label: <>Weights on CPU ({input.block_count - gpuLayers!} layers)<ParamTooltip text={PARAM_TOOLTIPS.gpuLayers} /></>, value: formatBytes(modelWeightsCPU ?? 0) },
-      { label: <>KV Cache ({kvCacheLocation})<ParamTooltip text={PARAM_TOOLTIPS.kvCache} /></>, value: formatBytes(slotMemory) },
-      { label: <>KV Per Slot<ParamTooltip text={PARAM_TOOLTIPS.kvPerSlot} /></>, value: formatBytes(kvPerSlot) },
-      { label: <>KV Per Token Per Layer<ParamTooltip text={PARAM_TOOLTIPS.kvPerTokenPerLayer} /></>, value: formatBytes(kvPerTokenPerLayer) },
-      { label: <>Compute Buffer (estimate)<ParamTooltip text={PARAM_TOOLTIPS.computeBuffer} /></>, value: `~${formatBytes(computeBufferEst ?? 0)}` },
+      { label: labelWithTip(`Weights on GPU (${gpuLayers} of ${input.block_count} layers)`, 'gpuLayers'), value: formatBytes(modelWeightsGPU ?? 0) },
+      { label: labelWithTip(`Weights on CPU (${input.block_count - gpuLayers!} layers)`, 'gpuLayers'), value: formatBytes(modelWeightsCPU ?? 0) },
+      { label: labelWithTip(`KV Cache (${kvCacheLocation})`, 'kvCache'), value: formatBytes(slotMemory) },
+      { label: labelWithTip('KV Per Slot', 'kvPerSlot'), value: formatBytes(kvPerSlot) },
+      { label: labelWithTip('KV Per Token Per Layer', 'kvPerTokenPerLayer'), value: formatBytes(kvPerTokenPerLayer) },
+      { label: labelWithTip('Compute Buffer (estimate)', 'computeBuffer'), value: `~${formatBytes(computeBufferEst ?? 0)}` },
     ];
   } else {
     breakdownRows = [
-      { label: <>Model Weights<ParamTooltip text={PARAM_TOOLTIPS.modelWeights} /></>, value: formatBytes(input.model_size_bytes) },
-      { label: <>KV Cache ({kvCacheLocation})<ParamTooltip text={PARAM_TOOLTIPS.kvCache} /></>, value: formatBytes(slotMemory) },
-      { label: <>KV Per Slot<ParamTooltip text={PARAM_TOOLTIPS.kvPerSlot} /></>, value: formatBytes(kvPerSlot) },
-      { label: <>KV Per Token Per Layer<ParamTooltip text={PARAM_TOOLTIPS.kvPerTokenPerLayer} /></>, value: formatBytes(kvPerTokenPerLayer) },
-      { label: <>Compute Buffer (estimate)<ParamTooltip text={PARAM_TOOLTIPS.computeBuffer} /></>, value: `~${formatBytes(computeBufferEst ?? 0)}` },
+      { label: labelWithTip('Model Weights', 'modelWeights'), value: formatBytes(input.model_size_bytes) },
+      { label: labelWithTip(`KV Cache (${kvCacheLocation})`, 'kvCache'), value: formatBytes(slotMemory) },
+      { label: labelWithTip('KV Per Slot', 'kvPerSlot'), value: formatBytes(kvPerSlot) },
+      { label: labelWithTip('KV Per Token Per Layer', 'kvPerTokenPerLayer'), value: formatBytes(kvPerTokenPerLayer) },
+      { label: labelWithTip('Compute Buffer (estimate)', 'computeBuffer'), value: `~${formatBytes(computeBufferEst ?? 0)}` },
     ];
   }
 
   const headerRows: { label: ReactNode; value: string }[] = [
-    { label: <>Model Size<ParamTooltip text={PARAM_TOOLTIPS.modelSize} /></>, value: formatBytes(input.model_size_bytes) },
-    { label: <>Layers (Block Count)<ParamTooltip text={PARAM_TOOLTIPS.blockCount} /></>, value: String(input.block_count) },
-    { label: <>Head Count KV<ParamTooltip text={PARAM_TOOLTIPS.headCountKV} /></>, value: String(input.head_count_kv) },
-    { label: <>Key Length<ParamTooltip text={PARAM_TOOLTIPS.keyLength} /></>, value: String(input.key_length) },
-    { label: <>Value Length<ParamTooltip text={PARAM_TOOLTIPS.valueLength} /></>, value: String(input.value_length) },
+    { label: labelWithTip('Model Size', 'modelSize'), value: formatBytes(input.model_size_bytes) },
+    { label: labelWithTip('Layers (Block Count)', 'blockCount'), value: String(input.block_count) },
+    { label: labelWithTip('Head Count KV', 'headCountKV'), value: String(input.head_count_kv) },
+    { label: labelWithTip('Key Length', 'keyLength'), value: String(input.key_length) },
+    { label: labelWithTip('Value Length', 'valueLength'), value: String(input.value_length) },
   ];
 
   if (isMoE) {
     headerRows.push(
-      { label: <>Expert Count<ParamTooltip text={PARAM_TOOLTIPS.expertCount} /></>, value: String(moe!.expert_count) },
-      { label: <>Active Experts (top-k)<ParamTooltip text={PARAM_TOOLTIPS.activeExperts} /></>, value: String(moe!.expert_used_count) },
+      { label: labelWithTip('Expert Count', 'expertCount'), value: String(moe!.expert_count) },
+      { label: labelWithTip('Active Experts (top-k)', 'activeExperts'), value: String(moe!.expert_used_count) },
     );
     if (moe!.has_shared_experts) {
-      headerRows.push({ label: <>Shared Experts<ParamTooltip text={PARAM_TOOLTIPS.sharedExperts} /></>, value: 'Yes' });
+      headerRows.push({ label: labelWithTip('Shared Experts', 'sharedExperts'), value: 'Yes' });
     }
   }
 
@@ -128,7 +133,7 @@ export default function VRAMResults({
     <div className="vram-results">
       <div className="vram-hero" style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '180px' }}>
-          <div className="vram-hero-label">Total Estimated VRAM<ParamTooltip text={PARAM_TOOLTIPS.totalEstimatedVRAM} /></div>
+          <div className="vram-hero-label">{labelWithTip('Total Estimated VRAM', 'totalEstimatedVRAM')}</div>
           <div className="vram-hero-value">
             {formatBytes(totalVram)}
             {effectiveGpuCapacity > 0 && (
@@ -138,7 +143,7 @@ export default function VRAMResults({
         </div>
         {showSystemRAM && systemRAMBytes != null && systemRAMBytes > 0 && (
           <div style={{ minWidth: '180px' }}>
-            <div className="vram-hero-label">Total Estimated System RAM<ParamTooltip text={PARAM_TOOLTIPS.totalEstimatedSystemRAM} /></div>
+            <div className="vram-hero-label">{labelWithTip('Total Estimated System RAM', 'totalEstimatedSystemRAM')}</div>
             <div className="vram-hero-value">
               {formatBytes(systemRamUsed)}
               <span style={{ fontSize: '0.55em', opacity: 0.5 }}> / {formatBytes(systemRAMBytes)}</span>
@@ -162,23 +167,24 @@ export default function VRAMResults({
 
         const hasConcerns = gpuTight || ramTight;
 
+        const hwLabel = isHardwareOverridden ? 'the selected hardware configuration' : 'this Kronk model server';
         let icon: string;
         let summary: string;
         if (gpuExceeds && ramExceeds) {
           icon = '❌';
-          summary = 'This model will NOT run on this Kronk model server — exceeds both GPU VRAM and system RAM';
+          summary = `This model will NOT run on ${hwLabel} — exceeds both GPU VRAM and system RAM`;
         } else if (gpuExceeds) {
           icon = '❌';
-          summary = 'This model will NOT run on this Kronk model server — exceeds available GPU VRAM';
+          summary = `This model will NOT run on ${hwLabel} — exceeds available GPU VRAM`;
         } else if (ramExceeds) {
           icon = '❌';
-          summary = 'This model will NOT run on this Kronk model server — exceeds available system RAM';
+          summary = `This model will NOT run on ${hwLabel} — exceeds available system RAM`;
         } else if (hasConcerns) {
           icon = '⚠️';
-          summary = 'This model will run on this Kronk model server but it\'s a tight fit';
+          summary = `This model will run on ${hwLabel} but it's a tight fit`;
         } else {
           icon = '✅';
-          summary = 'This model will run on this Kronk model server with these settings';
+          summary = `This model will run on ${hwLabel} with these settings`;
         }
 
         const details: string[] = [];
@@ -288,6 +294,7 @@ export default function VRAMResults({
         kvCacheOnCPU={kvOnCPU}
         deviceCount={deviceCount}
         tensorSplit={tensorSplit}
+        modelUrl={modelUrl}
       />
 
       <div className="vram-breakdown">
@@ -318,7 +325,21 @@ function cacheTypeName(bytesPerElement: number): string {
   }
 }
 
-function buildCatalogYAML(
+export interface VramComputedConfig {
+  contextWindow: number;
+  nseqMax: number;
+  cacheTypeK: string;
+  cacheTypeV: string;
+  flashAttention: string;
+  ngpuLayers: number | null;
+  offloadKQV: boolean | null;
+  splitMode: string;
+  tensorSplit: string;
+  moeMode: string;
+  moeKeepTopN: number | null;
+}
+
+function buildComputedCatalogConfig(
   input: VRAMInput,
   isMoE: boolean,
   gpuLayers?: number,
@@ -326,64 +347,103 @@ function buildCatalogYAML(
   kvCacheOnCPU?: boolean,
   deviceCount?: number,
   tensorSplit?: string,
-): string {
-  const lines: string[] = [];
-  lines.push('model-name/variant:');
-  lines.push(`  context-window: ${input.context_window}`);
-  lines.push(`  nseq-max: ${input.slots}`);
-
+): VramComputedConfig {
   const cacheType = cacheTypeName(input.bytes_per_element);
-  lines.push(`  cache-type-k: ${cacheType}`);
-  lines.push(`  cache-type-v: ${cacheType}`);
-
-  lines.push('  flash-attention: enabled');
-
-  // GPU layers: 0 in config = all on GPU, -1 = none on GPU.
-  if (gpuLayers != null && gpuLayers < input.block_count) {
-    lines.push(`  ngpu-layers: ${gpuLayers === 0 ? -1 : gpuLayers}`);
-  }
-
-  if (kvCacheOnCPU) {
-    lines.push('  offload-kqv: false');
-  }
-
   const gpuCount = deviceCount ?? 1;
-
-  // MoE expert offloading config: only applies when all layers are on GPU
-  // (expert offloading strategy). When gpuLayers < block_count, we're doing
-  // layer offloading and experts move with their layers — no moe: section needed.
   const allLayersOnGPU = gpuLayers == null || gpuLayers >= input.block_count;
+
+  let ngpuLayers: number | null = null;
+  if (gpuLayers != null && gpuLayers < input.block_count) {
+    ngpuLayers = gpuLayers === 0 ? -1 : gpuLayers;
+  }
+
+  let moeMode = '';
+  let moeKeepTopN: number | null = null;
   if (isMoE && allLayersOnGPU) {
     const layers = expertLayersOnGPU ?? 0;
     const allExpertsOnGPU = layers >= input.block_count;
     if (!allExpertsOnGPU) {
-      lines.push('  moe:');
       if (layers > 0) {
-        lines.push('    mode: keep_top_n');
-        lines.push(`    keep-experts-top-n: ${layers}`);
+        moeMode = 'keep_top_n';
+        moeKeepTopN = layers;
       } else {
-        lines.push('    mode: experts_cpu');
+        moeMode = 'experts_cpu';
       }
     }
   }
 
+  let splitMode = '';
+  let effectiveTensorSplit = '';
   if (gpuCount > 1) {
     const nums = tensorSplit
       ?.split(',')
       .map(s => parseFloat(s.trim()))
       .filter(n => !isNaN(n)) ?? [];
     if (nums.length > 0) {
-      lines.push(`  tensor-split: [${nums.join(', ')}]`);
+      effectiveTensorSplit = nums.join(', ');
     }
     if (isMoE) {
-      lines.push('  split-mode: row');
+      splitMode = 'row';
     }
+  }
+
+  return {
+    contextWindow: input.context_window,
+    nseqMax: input.slots,
+    cacheTypeK: cacheType,
+    cacheTypeV: cacheType,
+    flashAttention: 'enabled',
+    ngpuLayers,
+    offloadKQV: kvCacheOnCPU ? false : null,
+    splitMode,
+    tensorSplit: effectiveTensorSplit,
+    moeMode,
+    moeKeepTopN,
+  };
+}
+
+function configToYAML(config: VramComputedConfig): string {
+  const lines: string[] = [];
+  lines.push('model-name/variant:');
+  lines.push(`  context-window: ${config.contextWindow}`);
+  lines.push(`  nseq-max: ${config.nseqMax}`);
+  lines.push(`  cache-type-k: ${config.cacheTypeK}`);
+  lines.push(`  cache-type-v: ${config.cacheTypeV}`);
+  lines.push(`  flash-attention: ${config.flashAttention}`);
+
+  if (config.ngpuLayers != null) {
+    lines.push(`  ngpu-layers: ${config.ngpuLayers}`);
+  }
+
+  if (config.offloadKQV === false) {
+    lines.push('  offload-kqv: false');
+  }
+
+  if (config.moeMode) {
+    lines.push('  moe:');
+    lines.push(`    mode: ${config.moeMode}`);
+    if (config.moeMode === 'keep_top_n' && config.moeKeepTopN != null) {
+      lines.push(`    keep-experts-top-n: ${config.moeKeepTopN}`);
+    }
+  }
+
+  if (config.tensorSplit) {
+    lines.push(`  tensor-split: [${config.tensorSplit}]`);
+  }
+  if (config.splitMode) {
+    lines.push(`  split-mode: ${config.splitMode}`);
   }
 
   return lines.join('\n');
 }
 
-function CatalogConfigSection({ input, isMoE, gpuLayers, expertLayersOnGPU, kvCacheOnCPU, deviceCount, tensorSplit }: {
+export interface VramCatalogDraft {
+  source: 'vram';
+  modelUrl: string;
+  config: VramComputedConfig;
+}
+
+function CatalogConfigSection({ input, isMoE, gpuLayers, expertLayersOnGPU, kvCacheOnCPU, deviceCount, tensorSplit, modelUrl }: {
   input: VRAMInput;
   isMoE: boolean;
   gpuLayers?: number;
@@ -391,33 +451,62 @@ function CatalogConfigSection({ input, isMoE, gpuLayers, expertLayersOnGPU, kvCa
   kvCacheOnCPU?: boolean;
   deviceCount?: number;
   tensorSplit?: string;
+  modelUrl?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const yaml = buildCatalogYAML(input, isMoE, gpuLayers, expertLayersOnGPU, kvCacheOnCPU, deviceCount, tensorSplit);
+  const navigate = useNavigate();
+  const config = buildComputedCatalogConfig(input, isMoE, gpuLayers, expertLayersOnGPU, kvCacheOnCPU, deviceCount, tensorSplit);
+  const yaml = configToYAML(config);
+
+  const handleExport = () => {
+    const url = modelUrl?.trim();
+    if (!url) return;
+
+    const draft: VramCatalogDraft = {
+      source: 'vram',
+      modelUrl: url,
+      config,
+    };
+
+    sessionStorage.setItem('kronk_catalog_draft', JSON.stringify(draft));
+    navigate('/catalog/editor?source=vram');
+  };
 
   return (
     <div style={{ marginTop: '0px', padding: '0px 12px 25px 0px', background: 'var(--color-gray-50)', borderRadius: '6px' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-controls="computed-catalog-config"
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          fontSize: '14px',
-          fontWeight: 600,
-          color: 'var(--color-text)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
-      >
-        <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '12px' }}>▶</span>
-        Computed Catalog Configuration
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls="computed-catalog-config"
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: '12px' }}>▶</span>
+          Computed Catalog Configuration
+        </button>
+        {modelUrl?.trim() && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ fontSize: '0.8em', padding: '4px 10px' }}
+            onClick={handleExport}
+          >
+            Export to Catalog Editor
+          </button>
+        )}
+      </div>
       {open && (
         <pre id="computed-catalog-config" style={{
           marginTop: '8px',

@@ -2,7 +2,7 @@ import KeyValueTable from './KeyValueTable';
 import type { KVRow } from './KeyValueTable';
 import MetadataSection from './MetadataSection';
 import { fmtVal } from '../lib/format';
-import { labelWithTip } from './ParamTooltips';
+import { labelWithTip, type TooltipKey } from './ParamTooltips';
 
 const fileTypeMap: Record<string, string> = {
   '0': 'All F32',
@@ -42,12 +42,15 @@ function fmtFileType(v: string): string {
 interface ModelCardProps {
   metadata: Record<string, string>;
   excludeKeys?: string[];
+  webPage?: string;
 }
 
-export default function ModelCard({ metadata, excludeKeys = [] }: ModelCardProps) {
+export default function ModelCard({ metadata, excludeKeys = [], webPage }: ModelCardProps) {
   const allExclude = [...excludeKeys, 'tokenizer.chat_template'];
 
-  if (Object.keys(metadata).length === 0) {
+  const hasMetadata = Object.keys(metadata).length > 0;
+
+  if (!hasMetadata && !webPage) {
     return (
       <div className="empty-state">
         <p>No metadata available for this model.</p>
@@ -58,14 +61,16 @@ export default function ModelCard({ metadata, excludeKeys = [] }: ModelCardProps
   const get = (key: string): string | undefined => metadata[key];
   const arch = get('general.architecture') || '';
 
-  function buildRows(specs: Array<[string, string, string?]>): KVRow[] {
+  type MetadataRowSpec = [label: string, key: string, tooltipKey?: TooltipKey];
+
+  function buildRows(specs: MetadataRowSpec[]): KVRow[] {
     return specs
       .filter(([, key]) => get(key) !== undefined)
       .map(([label, key, tip]) => ({ key, label: tip ? labelWithTip(label, tip) : label, value: fmtVal(get(key)) }));
   }
 
   // --- Identity ---
-  const identitySpecs: Array<[string, string, string?]> = [
+  const identitySpecs: MetadataRowSpec[] = [
     ['Name', 'general.name'],
     ['Architecture', 'general.architecture', 'modelArchitecture'],
     ['Size Label', 'general.size_label', 'sizeLabel'],
@@ -87,7 +92,7 @@ export default function ModelCard({ metadata, excludeKeys = [] }: ModelCardProps
   }
 
   // --- Architecture ---
-  const archSpecs: Array<[string, string, string?]> = [
+  const archSpecs: MetadataRowSpec[] = [
     ['Layers', `${arch}.block_count`, 'blockCount'],
     ['Context Length', `${arch}.context_length`, 'contextLength'],
     ['Embedding Dimension', `${arch}.embedding_length`, 'embeddingDimension'],
@@ -172,23 +177,37 @@ export default function ModelCard({ metadata, excludeKeys = [] }: ModelCardProps
 
   return (
     <>
-      <div className="meta-sections">
-        {sections
-          .filter(s => s.rows.length > 0)
-          .map(s => (
-            <section key={s.title} className="meta-section">
-              <div className="meta-section-header">
-                <h4 className="meta-section-title">{s.title}</h4>
-              </div>
-              <KeyValueTable rows={s.rows} />
-            </section>
-          ))}
-      </div>
+      {webPage && (
+        <div style={{ marginBottom: '16px' }}>
+          <h4 className="meta-section-title" style={{ marginBottom: '8px' }}>Source</h4>
+          <p>
+            <a href={webPage} target="_blank" rel="noopener noreferrer">
+              {webPage}
+            </a>
+          </p>
+        </div>
+      )}
+      {hasMetadata && (
+        <>
+          <div className="meta-sections">
+            {sections
+              .filter(s => s.rows.length > 0)
+              .map(s => (
+                <section key={s.title} className="meta-section">
+                  <div className="meta-section-header">
+                    <h4 className="meta-section-title">{s.title}</h4>
+                  </div>
+                  <KeyValueTable rows={s.rows} />
+                </section>
+              ))}
+          </div>
 
-      <details className="model-card-raw-toggle">
-        <summary>Advanced / Raw Metadata</summary>
-        <MetadataSection metadata={metadata} excludeKeys={allExclude} />
-      </details>
+          <details className="model-card-raw-toggle">
+            <summary>Advanced / Raw Metadata</summary>
+            <MetadataSection metadata={metadata} excludeKeys={allExclude} />
+          </details>
+        </>
+      )}
     </>
   );
 }

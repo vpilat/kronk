@@ -5,9 +5,11 @@ import { api } from '../services/api';
 import type { DisplayMessage } from '../contexts/ChatContext';
 import { isChangedFrom, formatBaselineValue, hasAnyChange, hasAdvancedChange, type SamplingParams } from '../contexts/SamplingContext';
 import CodeBlock from './CodeBlock';
-import { PARAM_TOOLTIPS, ParamTooltip } from './ParamTooltips';
+import { PARAM_TOOLTIPS, FieldLabel } from './ParamTooltips';
 import { formatBytes } from '../lib/format';
 import type { ChatMessage, ChatUsage, ChatToolCall, ChatContentPart, ChatStreamResponse, VRAM } from '../types';
+import { VRAM_FIT_TEXT } from './vram';
+import type { DevicesInfo, MoeFitContext } from './vram';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -36,12 +38,9 @@ export interface ChatPanelProps {
 
   transport: StreamTransport;
 
-  isMoE?: boolean;
   modelVRAM?: VRAM | null;
-  devicesInfo?: { gpuCount: number; gpuType: string; gpuVramBytes: number; ramBytes: number } | null;
-  vramFitStatus?: 'fits' | 'tight' | 'wont_fit' | null;
-  vramNeededAllGPU?: number;
-  vramNeededCPUExperts?: number;
+  devicesInfo?: DevicesInfo | null;
+  moeFit?: MoeFitContext;
 
   disabled?: boolean;
   disabledPlaceholder?: string;
@@ -109,12 +108,9 @@ export default function ChatPanel({
   setSampling,
   modelBaseline,
   transport,
-  isMoE = false,
   modelVRAM,
   devicesInfo,
-  vramFitStatus,
-  vramNeededAllGPU = 0,
-  vramNeededCPUExperts = 0,
+  moeFit,
   disabled = false,
   disabledPlaceholder,
   headerLeft,
@@ -487,12 +483,11 @@ export default function ChatPanel({
         </div>
         <div className="chat-settings">
           <div className={`chat-setting ${isChangedFrom('maxTokens', sampling.maxTokens, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-            <label>
-              Max Tokens{PARAM_TOOLTIPS.max_tokens && <ParamTooltip text={PARAM_TOOLTIPS.max_tokens} />}
-              {isChangedFrom('maxTokens', sampling.maxTokens, modelBaseline) && (
+            <FieldLabel tooltipKey="max_tokens" after={isChangedFrom('maxTokens', sampling.maxTokens, modelBaseline) && (
                 <span className="chat-setting-default" title={`Default: ${formatBaselineValue('maxTokens', modelBaseline)}`}>●</span>
-              )}
-            </label>
+              )}>
+              Max Tokens
+            </FieldLabel>
             <input
               type="number"
               value={sampling.maxTokens}
@@ -502,12 +497,11 @@ export default function ChatPanel({
             />
           </div>
           <div className={`chat-setting ${isChangedFrom('temperature', sampling.temperature, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-            <label>
-              Temperature{PARAM_TOOLTIPS.temperature && <ParamTooltip text={PARAM_TOOLTIPS.temperature} />}
-              {isChangedFrom('temperature', sampling.temperature, modelBaseline) && (
+            <FieldLabel tooltipKey="temperature" after={isChangedFrom('temperature', sampling.temperature, modelBaseline) && (
                 <span className="chat-setting-default" title={`Default: ${formatBaselineValue('temperature', modelBaseline)}`}>●</span>
-              )}
-            </label>
+              )}>
+              Temperature
+            </FieldLabel>
             <input
               type="number"
               value={sampling.temperature}
@@ -518,12 +512,11 @@ export default function ChatPanel({
             />
           </div>
           <div className={`chat-setting ${isChangedFrom('topP', sampling.topP, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-            <label>
-              Top P{PARAM_TOOLTIPS.top_p && <ParamTooltip text={PARAM_TOOLTIPS.top_p} />}
-              {isChangedFrom('topP', sampling.topP, modelBaseline) && (
+            <FieldLabel tooltipKey="top_p" after={isChangedFrom('topP', sampling.topP, modelBaseline) && (
                 <span className="chat-setting-default" title={`Default: ${formatBaselineValue('topP', modelBaseline)}`}>●</span>
-              )}
-            </label>
+              )}>
+              Top P
+            </FieldLabel>
             <input
               type="number"
               value={sampling.topP}
@@ -534,12 +527,11 @@ export default function ChatPanel({
             />
           </div>
           <div className={`chat-setting ${isChangedFrom('topK', sampling.topK, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-            <label>
-              Top K{PARAM_TOOLTIPS.top_k && <ParamTooltip text={PARAM_TOOLTIPS.top_k} />}
-              {isChangedFrom('topK', sampling.topK, modelBaseline) && (
+            <FieldLabel tooltipKey="top_k" after={isChangedFrom('topK', sampling.topK, modelBaseline) && (
                 <span className="chat-setting-default" title={`Default: ${formatBaselineValue('topK', modelBaseline)}`}>●</span>
-              )}
-            </label>
+              )}>
+              Top K
+            </FieldLabel>
             <input
               type="number"
               value={sampling.topK}
@@ -630,7 +622,7 @@ export default function ChatPanel({
             />
           </div>
         )}
-        {isMoE && modelVRAM && (
+        {moeFit?.isMoe && modelVRAM && (
           <div className="chat-settings" style={{ flexDirection: 'column', gap: '8px', padding: '12px', background: 'var(--color-gray-50)', borderRadius: '6px', margin: '0 0 8px' }}>
             <div style={{ fontWeight: 600, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               🧩 MoE Model
@@ -673,15 +665,13 @@ export default function ChatPanel({
                 Total VRAM: {formatBytes(modelVRAM.total_vram)}
               </div>
             )}
-            {vramFitStatus && devicesInfo && (
-              <div className={`playground-vram-fit playground-vram-fit--${vramFitStatus}`}>
-                {vramFitStatus === 'fits' && '✅ Fits in VRAM'}
-                {vramFitStatus === 'tight' && '⚠️ Experts won\'t fit — CPU offload recommended'}
-                {vramFitStatus === 'wont_fit' && '❌ Tight even with CPU experts'}
+            {moeFit?.fit?.status && devicesInfo && (
+              <div className={`playground-vram-fit playground-vram-fit--${moeFit.fit.status}`}>
+                {VRAM_FIT_TEXT[moeFit.fit.status]}
                 <span className="playground-vram-fit-detail">
                   {' '}({formatBytes(devicesInfo.gpuVramBytes)} available
-                  {vramFitStatus !== 'fits' && `, ${formatBytes(vramNeededCPUExperts)} needed with CPU experts`}
-                  {vramFitStatus === 'fits' && `, ${formatBytes(vramNeededAllGPU)} needed`})
+                  {moeFit.fit.status !== 'fits' && `, ${formatBytes(moeFit.fit.cpuExperts)} needed with CPU experts`}
+                  {moeFit.fit.status === 'fits' && `, ${formatBytes(moeFit.fit.allGPU)} needed`})
                 </span>
               </div>
             )}
@@ -694,12 +684,11 @@ export default function ChatPanel({
           <div className="chat-settings">
             <div className="chat-advanced-settings">
                 <div className={`chat-setting ${isChangedFrom('minP', sampling.minP, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Min P{PARAM_TOOLTIPS.min_p && <ParamTooltip text={PARAM_TOOLTIPS.min_p} />}
-                    {isChangedFrom('minP', sampling.minP, modelBaseline) && (
+                  <FieldLabel tooltipKey="min_p" after={isChangedFrom('minP', sampling.minP, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('minP', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Min P
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.minP}
@@ -710,12 +699,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('repeatPenalty', sampling.repeatPenalty, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Repeat Penalty{PARAM_TOOLTIPS.repeat_penalty && <ParamTooltip text={PARAM_TOOLTIPS.repeat_penalty} />}
-                    {isChangedFrom('repeatPenalty', sampling.repeatPenalty, modelBaseline) && (
+                  <FieldLabel tooltipKey="repeat_penalty" after={isChangedFrom('repeatPenalty', sampling.repeatPenalty, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('repeatPenalty', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Repeat Penalty
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.repeatPenalty}
@@ -726,12 +714,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('repeatLastN', sampling.repeatLastN, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Repeat Last N{PARAM_TOOLTIPS.repeat_last_n && <ParamTooltip text={PARAM_TOOLTIPS.repeat_last_n} />}
-                    {isChangedFrom('repeatLastN', sampling.repeatLastN, modelBaseline) && (
+                  <FieldLabel tooltipKey="repeat_last_n" after={isChangedFrom('repeatLastN', sampling.repeatLastN, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('repeatLastN', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Repeat Last N
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.repeatLastN}
@@ -741,12 +728,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('frequencyPenalty', sampling.frequencyPenalty, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Frequency Penalty{PARAM_TOOLTIPS.frequency_penalty && <ParamTooltip text={PARAM_TOOLTIPS.frequency_penalty} />}
-                    {isChangedFrom('frequencyPenalty', sampling.frequencyPenalty, modelBaseline) && (
+                  <FieldLabel tooltipKey="frequency_penalty" after={isChangedFrom('frequencyPenalty', sampling.frequencyPenalty, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('frequencyPenalty', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Frequency Penalty
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.frequencyPenalty}
@@ -757,12 +743,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('presencePenalty', sampling.presencePenalty, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Presence Penalty{PARAM_TOOLTIPS.presence_penalty && <ParamTooltip text={PARAM_TOOLTIPS.presence_penalty} />}
-                    {isChangedFrom('presencePenalty', sampling.presencePenalty, modelBaseline) && (
+                  <FieldLabel tooltipKey="presence_penalty" after={isChangedFrom('presencePenalty', sampling.presencePenalty, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('presencePenalty', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Presence Penalty
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.presencePenalty}
@@ -773,12 +758,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('dryMultiplier', sampling.dryMultiplier, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    DRY Multiplier{PARAM_TOOLTIPS.dry_multiplier && <ParamTooltip text={PARAM_TOOLTIPS.dry_multiplier} />}
-                    {isChangedFrom('dryMultiplier', sampling.dryMultiplier, modelBaseline) && (
+                  <FieldLabel tooltipKey="dry_multiplier" after={isChangedFrom('dryMultiplier', sampling.dryMultiplier, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('dryMultiplier', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    DRY Multiplier
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.dryMultiplier}
@@ -788,12 +772,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('dryBase', sampling.dryBase, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    DRY Base{PARAM_TOOLTIPS.dry_base && <ParamTooltip text={PARAM_TOOLTIPS.dry_base} />}
-                    {isChangedFrom('dryBase', sampling.dryBase, modelBaseline) && (
+                  <FieldLabel tooltipKey="dry_base" after={isChangedFrom('dryBase', sampling.dryBase, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('dryBase', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    DRY Base
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.dryBase}
@@ -803,12 +786,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('dryAllowedLen', sampling.dryAllowedLen, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    DRY Allowed Length{PARAM_TOOLTIPS.dry_allowed_length && <ParamTooltip text={PARAM_TOOLTIPS.dry_allowed_length} />}
-                    {isChangedFrom('dryAllowedLen', sampling.dryAllowedLen, modelBaseline) && (
+                  <FieldLabel tooltipKey="dry_allowed_length" after={isChangedFrom('dryAllowedLen', sampling.dryAllowedLen, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('dryAllowedLen', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    DRY Allowed Length
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.dryAllowedLen}
@@ -817,12 +799,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('dryPenaltyLast', sampling.dryPenaltyLast, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    DRY Penalty Last N{PARAM_TOOLTIPS.dry_penalty_last_n && <ParamTooltip text={PARAM_TOOLTIPS.dry_penalty_last_n} />}
-                    {isChangedFrom('dryPenaltyLast', sampling.dryPenaltyLast, modelBaseline) && (
+                  <FieldLabel tooltipKey="dry_penalty_last_n" after={isChangedFrom('dryPenaltyLast', sampling.dryPenaltyLast, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('dryPenaltyLast', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    DRY Penalty Last N
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.dryPenaltyLast}
@@ -831,12 +812,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('xtcProbability', sampling.xtcProbability, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    XTC Probability{PARAM_TOOLTIPS.xtc_probability && <ParamTooltip text={PARAM_TOOLTIPS.xtc_probability} />}
-                    {isChangedFrom('xtcProbability', sampling.xtcProbability, modelBaseline) && (
+                  <FieldLabel tooltipKey="xtc_probability" after={isChangedFrom('xtcProbability', sampling.xtcProbability, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('xtcProbability', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    XTC Probability
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.xtcProbability}
@@ -847,12 +827,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('xtcThreshold', sampling.xtcThreshold, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    XTC Threshold{PARAM_TOOLTIPS.xtc_threshold && <ParamTooltip text={PARAM_TOOLTIPS.xtc_threshold} />}
-                    {isChangedFrom('xtcThreshold', sampling.xtcThreshold, modelBaseline) && (
+                  <FieldLabel tooltipKey="xtc_threshold" after={isChangedFrom('xtcThreshold', sampling.xtcThreshold, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('xtcThreshold', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    XTC Threshold
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.xtcThreshold}
@@ -863,12 +842,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('xtcMinKeep', sampling.xtcMinKeep, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    XTC Min Keep{PARAM_TOOLTIPS.xtc_min_keep && <ParamTooltip text={PARAM_TOOLTIPS.xtc_min_keep} />}
-                    {isChangedFrom('xtcMinKeep', sampling.xtcMinKeep, modelBaseline) && (
+                  <FieldLabel tooltipKey="xtc_min_keep" after={isChangedFrom('xtcMinKeep', sampling.xtcMinKeep, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('xtcMinKeep', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    XTC Min Keep
+                  </FieldLabel>
                   <input
                     type="number"
                     value={sampling.xtcMinKeep}
@@ -877,12 +855,11 @@ export default function ChatPanel({
                   />
                 </div>
                 <div className={`chat-setting ${isChangedFrom('enableThinking', sampling.enableThinking, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Enable Thinking{PARAM_TOOLTIPS.enable_thinking && <ParamTooltip text={PARAM_TOOLTIPS.enable_thinking} />}
-                    {isChangedFrom('enableThinking', sampling.enableThinking, modelBaseline) && (
+                  <FieldLabel tooltipKey="enable_thinking" after={isChangedFrom('enableThinking', sampling.enableThinking, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('enableThinking', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Enable Thinking
+                  </FieldLabel>
                   <select
                     value={sampling.enableThinking}
                     onChange={(e) => setSampling({ enableThinking: e.target.value })}
@@ -893,12 +870,11 @@ export default function ChatPanel({
                   </select>
                 </div>
                 <div className={`chat-setting ${isChangedFrom('reasoningEffort', sampling.reasoningEffort, modelBaseline) ? 'chat-setting-changed' : ''}`}>
-                  <label>
-                    Reasoning Effort{PARAM_TOOLTIPS.reasoning_effort && <ParamTooltip text={PARAM_TOOLTIPS.reasoning_effort} />}
-                    {isChangedFrom('reasoningEffort', sampling.reasoningEffort, modelBaseline) && (
+                  <FieldLabel tooltipKey="reasoning_effort" after={isChangedFrom('reasoningEffort', sampling.reasoningEffort, modelBaseline) && (
                       <span className="chat-setting-default" title={`Default: ${formatBaselineValue('reasoningEffort', modelBaseline)}`}>●</span>
-                    )}
-                  </label>
+                    )}>
+                    Reasoning Effort
+                  </FieldLabel>
                   <select
                     value={sampling.reasoningEffort}
                     onChange={(e) => setSampling({ reasoningEffort: e.target.value })}
