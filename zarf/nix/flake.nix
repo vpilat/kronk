@@ -1,10 +1,20 @@
 {
   description = "Go Kronk workspace";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "nixpkgs/nixos-unstable";
+    gomod2nix = {
+      url = "github:nix-community/gomod2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      gomod2nix,
+    }:
     let
       supportedSystems = [
         "x86_64-linux"
@@ -20,14 +30,23 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
 
-          kronkBase = (pkgs.buildGoModule.override { go = pkgs.go_1_26; }) {
+          kronkBase = gomod2nix.legacyPackages.${system}.buildGoApplication {
             pname = "kronk";
-            version = "1.21.3";
+            version =
+              let
+                src = builtins.readFile ../../sdk/kronk/kronk.go;
+                lines = builtins.filter builtins.isString (builtins.split "\n" src);
+                versionLine = builtins.head (
+                  builtins.filter (l: builtins.match "const Version = .*" l != null) lines
+                );
+                match = builtins.match "const Version = \"([^\"]+)\"" versionLine;
+              in
+              builtins.head match;
             src = ../../.;
             subPackages = [ "cmd/kronk" ];
-            vendorHash = "sha256-EF+wcHqrZV/zE9KdvJv353huhlbuPm7Na6cSizJl/dg=";
+            modules = ./gomod2nix.toml;
 
-            env.CGO_ENABLED = 0;
+            go = pkgs.go_1_26;
           };
 
           # Wrap kronk with the runtime libs needed for dynamic library loading.
@@ -84,6 +103,7 @@
             pkgs.typescript
             pkgs.vite
             pkgs.nodejs
+            gomod2nix.legacyPackages.${system}.gomod2nix
           ];
 
           # Shared environment variables across all dev shells.
@@ -99,6 +119,9 @@
             }:
             pkgs.mkShell {
               buildInputs = basePackages ++ extraPackages;
+              shellHook = ''
+                gomod2nix import &> /dev/null
+              '';
 
               LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (baseLibs ++ extraLibs);
             };
