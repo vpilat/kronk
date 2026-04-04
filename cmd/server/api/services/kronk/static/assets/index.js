@@ -1121,14 +1121,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
-	fmt.Println("- grammar      :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -1291,13 +1303,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow. :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -1444,8 +1469,8 @@ type modelSpec struct {
 // Configure this to switch between URL and catalog downloads.
 // Set either SourceURL or ModelID, not both.
 var modelSpecConfig = modelSpec{
-	SourceURL: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
-	//ModelID: "Qwen3-0.6B-Q8_0",
+	//SourceURL: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
+	ModelID: "Qwen3-0.6B-Q8_0",
 }
 
 func main() {
@@ -1562,14 +1587,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
-	fmt.Println("- grammar      :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -1921,14 +1958,27 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- embeddings   :", krn.ModelInfo().IsEmbedModel)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- embeddings     :", krn.ModelInfo().IsEmbedModel)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -2136,13 +2186,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -2425,13 +2488,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -2644,14 +2720,27 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- embeddings   :", krn.ModelInfo().IsEmbedModel)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- embeddings     :", krn.ModelInfo().IsEmbedModel)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -2858,13 +2947,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
@@ -3204,13 +3306,26 @@ func newKronk(mp models.Path) (*kronk.Kronk, error) {
 	}
 	fmt.Println()
 
-	fmt.Println("- contextWindow:", krn.ModelConfig().ContextWindow)
-	fmt.Printf("- k/v          : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
-	fmt.Println("- nBatch       :", krn.ModelConfig().NBatch)
-	fmt.Println("- nuBatch      :", krn.ModelConfig().NUBatch)
-	fmt.Println("- modelType    :", krn.ModelInfo().Type)
-	fmt.Println("- isGPT        :", krn.ModelInfo().IsGPTModel)
-	fmt.Println("- template     :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- contextWindow  :", krn.ModelConfig().ContextWindow)
+	fmt.Printf("- k/v            : %s/%s\\n", krn.ModelConfig().CacheTypeK, krn.ModelConfig().CacheTypeV)
+	fmt.Println("- flashAttention :", krn.ModelConfig().FlashAttention)
+	fmt.Println("- nBatch         :", krn.ModelConfig().NBatch)
+	fmt.Println("- nuBatch        :", krn.ModelConfig().NUBatch)
+	fmt.Println("- modelType      :", krn.ModelInfo().Type)
+	fmt.Println("- isGPT          :", krn.ModelInfo().IsGPTModel)
+	fmt.Println("- template       :", krn.ModelInfo().Template.FileName)
+	fmt.Println("- grammar        :", krn.ModelConfig().DefaultParams.Grammar != "")
+	fmt.Println("- nSeqMax        :", krn.ModelConfig().NSeqMax)
+	fmt.Println("- vramTotal      :", krn.ModelInfo().VRAMTotal/(1024*1024), "MiB")
+	fmt.Println("- slotMemory     :", krn.ModelInfo().SlotMemory/(1024*1024), "MiB")
+	fmt.Println("- modelSize      :", krn.ModelInfo().Size/(1000*1000), "MB")
+	fmt.Println("- spc            :", krn.ModelConfig().SystemPromptCache)
+	fmt.Println("- imc            :", krn.ModelConfig().IncrementalCache)
+	if n := krn.ModelConfig().NGpuLayers; n != nil {
+		fmt.Println("- nGPULayers     :", *n)
+	} else {
+		fmt.Println("- nGPULayers     : all")
+	}
 
 	return krn, nil
 }
