@@ -445,10 +445,6 @@ func validateConfig(ctx context.Context, cfg Config, log applog.Logger) error {
 		return fmt.Errorf("validate-config: model file is required")
 	}
 
-	if len(cfg.Devices) > 0 {
-		return fmt.Errorf("validate-config: Device and Devices are mutually exclusive; use Devices only (Device is deprecated)")
-	}
-
 	if len(cfg.TensorSplit) > 0 && len(cfg.Devices) > 0 && len(cfg.TensorSplit) != len(cfg.Devices) {
 		return fmt.Errorf("validate-config: TensorSplit length (%d) must match Devices length (%d)", len(cfg.TensorSplit), len(cfg.Devices))
 	}

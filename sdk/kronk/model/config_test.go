@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"testing"
 )
 
@@ -73,5 +74,31 @@ func TestParseGGMLType(t *testing.T) {
 				t.Errorf("ParseGGMLType() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestValidateConfig(t *testing.T) {
+	discardLogger := func(ctx context.Context, msg string, args ...any) {}
+
+	tests := []struct {
+		want    string
+		cfg     Config
+		wantErr bool
+	}{
+		{"multi GPU setup is valid", NewConfig(
+			WithDevices([]string{"CUDA0", "CUDA1"}),
+			WithModelFiles([]string{"dummy.gguf"}),
+		), false},
+	}
+	{
+		for _, tt := range tests {
+			t.Run(tt.want, func(t *testing.T) {
+				err := validateConfig(context.Background(), tt.cfg, discardLogger)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+			})
+		}
 	}
 }
