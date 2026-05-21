@@ -3064,15 +3064,31 @@ Request 5 (text follow-up about the image):
               </tr>
               <tr>
                 <td><code>speculative status=mtp-disabled-imc-hit</code></td>
-                <td>MTP disabled for this request because the prompt hit IMC cache; the next request on the slot can use MTP again. (See §6.7.)</td>
+                <td>MTP disabled for this request because the IMC cache hit didn't carry a draft-seq snapshot (no draft state on the matched session, or the restore returned 0 bytes). MTP-aware IMC builds — the default since this fix — snapshot the draft seq state and pendingH alongside the target so cache hits keep MTP running. (See §6.7.)</td>
               </tr>
               <tr>
-                <td><code>speculative status=mtp-disabled-hybrid-restore</code></td>
-                <td>MTP disabled for the remainder of the request after a hybrid-target rollback. The slot continues target-only.</td>
+                <td><code>start-slot status=imc-draft-snapshot-done</code></td>
+                <td>The cache-build path snapshotted both the target seq state and the MTP draft seq state into the session. Carries <code>snapshot_bytes</code>, <code>kv_alloc</code>, <code>buf_action</code>, <code>pending_h</code>.</td>
+              </tr>
+              <tr>
+                <td><code>start-slot status=imc-draft-restore-done</code></td>
+                <td>A cache hit restored both the target seq and the MTP draft seq state from the session, plus the slot's <code>pendingH</code>. Carries <code>restored_bytes</code>, <code>pending_h</code>, <code>elapsed</code>.</td>
+              </tr>
+              <tr>
+                <td><code>start-slot status=imc-draft-restore-failed</code></td>
+                <td>The session had a draft snapshot but <code>StateSeqSetData(draft)</code> returned 0 bytes. The slot continues target-only; MTP is disabled for this request via <code>mtp-disabled-imc-hit</code>.</td>
+              </tr>
+              <tr>
+                <td><code>start-slot status=imc-draft-restore-skip-empty</code></td>
+                <td>The session has no draft snapshot (e.g., built before this fix or build-time draft snapshot failed). MTP is disabled for this request via <code>mtp-disabled-imc-hit</code>.</td>
               </tr>
               <tr>
                 <td><code>speculative status=mtp-disabled-mirror-error</code></td>
                 <td>MTP disabled for the remainder of the request after a post-verify mirror failure. The slot continues target-only.</td>
+              </tr>
+              <tr>
+                <td><code>speculative status=verify-prenorm-capture-error</code></td>
+                <td>Phase A failed to capture the slot's pre-norm rows into <code>verifyH</code>. Phase B's mirror falls back to the live target buffer; on hybrid targets this may force a <code>mirror-error</code> disable if a restore also ran.</td>
               </tr>
             </tbody>
           </table>
@@ -3117,12 +3133,8 @@ Request 5 (text follow-up about the image):
                 <td>The MTP path always runs greedy verification, so strict Leviathan-style distribution equivalence at <code>temperature &gt; 0</code> is not guaranteed. The full slot sampler (temperature / top-k / top-p) is still applied at each accepted position, so output shape is preserved.</td>
               </tr>
               <tr>
-                <td>MTP + IMC: MTP disabled on cache hits</td>
-                <td>If an incoming request hits the Incremental Message Cache, MTP is disabled for that request — IMC restores the target sequence state but does not carry the draft sequence state with it. The slot falls back to plain target decoding; the next request on the same slot can use MTP again.</td>
-              </tr>
-              <tr>
-                <td>MTP + hybrid targets: MTP disabled after a partial-reject rollback</td>
-                <td>On a hybrid (transformer + recurrent) target, a partial-reject round triggers a snapshot/restore that invalidates the MTP draft state. The slot disables MTP for the remainder of the request and continues target-only.</td>
+                <td>MTP + IMC: draft state must come from an MTP-aware build</td>
+                <td>IMC cache hits keep MTP running by restoring the draft seq KV + <code>pendingH</code> snapshotted alongside the target during the cache build. Sessions whose cache was built before this fix (no draft snapshot on disk/RAM) fall back to disabling MTP for the cache-hit request only — they re-enable on the next request once the cache is rebuilt by an MTP-aware path.</td>
               </tr>
               <tr>
                 <td>MTP + hybrid targets: f16 KV cache + no Flash Attention required</td>
@@ -7937,6 +7949,7 @@ mirror[k>0] : token = tgt[start+k],  embd = h_tgt[start+k-1]`}</code></pre>
           <p>The snapshot buffer is lazy-grow / never-shrink on the slot (<code>s.specSnapshot</code>). Size scales with current KV occupancy, so the cost grows with context length. Dense / pure-attention targets skip this path entirely — <code>MemorySeqRm</code> is correct and much cheaper for them.</p>
           <p>The captureTarget/restoreTarget hooks are gated on <code>e.model.modelInfo.Type == ModelTypeHybrid</code> so the dense fast path is untouched. If <code>captureTargetSpecSnapshot</code> errors, <code>verifySpeculativeTokens</code> clears <code>s.specSnapshot</code> and falls through to <code>MemorySeqRm</code>. The fallback is broken on hybrid partial-reject rounds, but full-accept rounds still work, and the next request begins with a fresh sequence anyway.</p>
           <p><strong>Multi-slot interaction.</strong> <code>restoreTargetSpecSnapshot</code>'s re-decode invalidates the target's per-context logit buffer for every other batch row. With <code>nseq-max &gt; 1</code> this is benign because the restore only runs in Pass 2B (<code>finalizeSpeculativeTokens</code>), after every other spec slot has read its logits in Pass 2A. See §18.12.5.</p>
+          <p><strong>MTP mirror interaction.</strong> The same re-decode also overwrites the target's per-context <strong>pre-norm</strong> buffer with rows indexed against the small rebatch, not the original shared <code>e.batch</code>. Phase B's MTP mirror (<code>mirrorTargetBatchToMTPDraft</code>) would then read the wrong pre-norm rows. To decouple the mirror from the restore, Phase A (<code>verifySpeculativeTokens</code>) copies the slot's pre-norm rows into a slot-local <code>s.verifyH</code> buffer via <code>captureVerifyPreNorm</code> <strong>before</strong> any Phase B side-effect can mutate the live buffer. Phase B's mirror reads from <code>s.verifyH</code> when populated, so MTP keeps running across partial rejections on hybrid targets instead of being disabled for the rest of the request.</p>
           <h4 id="18127-per-slot-mtp-state">18.12.7 Per-Slot MTP State</h4>
           <p>PR #593 added the following fields to <code>slot</code> in <a href="file:///Users/bill/code/go/src/github.com/ardanlabs/kronk/sdk/kronk/model/batch_slot.go"><code>batch_slot.go</code></a>. All are reset in <code>slot.reset()</code> with lazy-grow / never-shrink buffer policy.</p>
           <table className="flags-table">
@@ -7961,7 +7974,11 @@ mirror[k>0] : token = tgt[start+k],  embd = h_tgt[start+k-1]`}</code></pre>
               </tr>
               <tr>
                 <td><code>mtpDisabledForRequest</code></td>
-                <td>Disables MTP for the remainder of the current request. Set at <code>startSlot</code> on IMC cache hits (the IMC restore covers only the target seq, so the draft KV would be stale), and set inside <code>finalizeSpeculativeTokens</code> after a hybrid restore re-decode or a post-rollback mirror failure (in those cases the draft KV is wiped and the slot continues target-only). Cleared by <code>slot.reset()</code> when the slot is recycled for the next request.</td>
+                <td>Disables MTP for the remainder of the current request. Set at <code>startSlot</code> on IMC cache hits where the matched session has no draft-seq snapshot (or the draft restore returned 0 bytes) — MTP-aware IMC builds snapshot both target and draft seqs so this failsafe rarely fires on freshly-built caches. Also set inside <code>finalizeSpeculativeTokens</code> after a post-rollback mirror failure (the draft KV is wiped and the slot continues target-only). Cleared by <code>slot.reset()</code> when the slot is recycled for the next request.</td>
+              </tr>
+              <tr>
+                <td><code>verifyH []float32</code></td>
+                <td>Slot-local cache of the target's pre-norm hidden-state rows for the just-decoded spec batch range (1+nDraft rows of nEmbd floats). Captured at the top of <code>verifySpeculativeTokens</code> (Phase A) BEFORE any Phase B side-effect (notably <code>restoreTargetSpecSnapshot</code>'s re-decode on a hybrid target) can invalidate the per-context pre-norm buffer. <code>mirrorTargetBatchToMTPDraft</code> reads from this buffer when populated and clears it after consumption. Lazy-grow / never-shrink.</td>
               </tr>
               <tr>
                 <td><code>specSnapshot []byte</code></td>
@@ -8004,7 +8021,7 @@ mirror[k>0] : token = tgt[start+k],  embd = h_tgt[start+k-1]`}</code></pre>
               </tr>
               <tr>
                 <td><a href="file:///Users/bill/code/go/src/github.com/ardanlabs/kronk/sdk/kronk/model/batch_mtp.go"><code>sdk/kronk/model/batch_mtp.go</code></a></td>
-                <td><code>mirrorTargetBatchToMTPDraft</code>, <code>generateDraftTokensMTP</code>, helpers (<code>batchTokensAt</code>, <code>mirrorBatchCapacity</code>).</td>
+                <td><code>mirrorTargetBatchToMTPDraft</code>, <code>generateDraftTokensMTP</code>, <code>decodeTokensIntoCacheMTP</code> (IMC cache build with mirror), <code>mirrorBuildChunkToMTPDraft</code>, helpers (<code>batchTokensAt</code>, <code>mirrorBatchCapacity</code>).</td>
               </tr>
               <tr>
                 <td><a href="file:///Users/bill/code/go/src/github.com/ardanlabs/kronk/sdk/kronk/model/yzma.go"><code>sdk/kronk/model/yzma.go</code></a></td>
@@ -8020,7 +8037,7 @@ mirror[k>0] : token = tgt[start+k],  embd = h_tgt[start+k-1]`}</code></pre>
               </tr>
               <tr>
                 <td><a href="file:///Users/bill/code/go/src/github.com/ardanlabs/kronk/sdk/kronk/model/batch_slot_start.go"><code>sdk/kronk/model/batch_slot_start.go</code></a></td>
-                <td>Skips separate-draft-prefill on MTP; disables MTP for the request on IMC cache hits (draft KV would be stale).</td>
+                <td>Skips separate-draft-prefill on MTP; dispatches the MTP-aware <code>decodeTokensIntoCacheMTP</code> during IMC cache build so draft KV is populated in lock-step; snapshots/restores the draft seq + pendingH alongside the target so cache hits keep MTP running. Only disables MTP for a cache-hit request when the matched session has no draft snapshot.</td>
               </tr>
               <tr>
                 <td><a href="file:///Users/bill/code/go/src/github.com/ardanlabs/kronk/sdk/kronk/model/batch_engine.go"><code>sdk/kronk/model/batch_engine.go</code></a></td>
